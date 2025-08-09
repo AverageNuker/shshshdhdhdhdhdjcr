@@ -4,76 +4,6 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 
-local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-
-local Folder = Instance.new("Folder", Workspace)
-local Part = Instance.new("Part", Folder)
-local Attachment1 = Instance.new("Attachment", Part)
-Part.Anchored = true
-Part.CanCollide = false
-Part.Transparency = 1
-
-if not getgenv().Network then
-    getgenv().Network = {
-        BaseParts = {},
-        Velocity = Vector3.new(14.46262424, 14.46262424, 14.46262424)
-    }
-
-    Network.RetainPart = function(Part)
-        if typeof(Part) == "Instance" and Part:IsA("BasePart") and Part:IsDescendantOf(Workspace) then
-            table.insert(Network.BaseParts, Part)
-            Part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
-            Part.CanCollide = false
-        end
-    end
-
-    local function EnablePartControl()
-        LocalPlayer.ReplicationFocus = Workspace
-        RunService.Heartbeat:Connect(function()
-            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
-            for _, Part in pairs(Network.BaseParts) do
-                if Part:IsDescendantOf(Workspace) then
-                    Part.Velocity = Network.Velocity
-                end
-            end
-        end)
-    end
-
-    EnablePartControl()
-end
-
-local function ForcePart(v)
-    if v:IsA("Part") and not v.Anchored and not v.Parent:FindFirstChild("Humanoid") and not v.Parent:FindFirstChild("Head") and v.Name ~= "Handle" then
-        for _, x in next, v:GetChildren() do
-            if x:IsA("BodyAngularVelocity") or x:IsA("BodyForce") or x:IsA("BodyGyro") or x:IsA("BodyPosition") or x:IsA("BodyThrust") or x:IsA("BodyVelocity") or x:IsA("RocketPropulsion") then
-                x:Destroy()
-            end
-        end
-        if v:FindFirstChild("Attachment") then
-            v:FindFirstChild("Attachment"):Destroy()
-        end
-        if v:FindFirstChild("AlignPosition") then
-            v:FindFirstChild("AlignPosition"):Destroy()
-        end
-        if v:FindFirstChild("Torque") then
-            v:FindFirstChild("Torque"):Destroy()
-        end
-        v.CanCollide = false
-        local Torque = Instance.new("Torque", v)
-        Torque.Torque = Vector3.new(100000, 100000, 100000)
-        local AlignPosition = Instance.new("AlignPosition", v)
-        local Attachment2 = Instance.new("Attachment", v)
-        Torque.Attachment0 = Attachment2
-        AlignPosition.MaxForce = 9999999999999999
-        AlignPosition.MaxVelocity = math.huge
-        AlignPosition.Responsiveness = 200
-        AlignPosition.Attachment0 = Attachment2
-        AlignPosition.Attachment1 = Attachment1
-    end
-end
-
-
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RingPartsControl"
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -85,6 +15,7 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 mainFrame.BackgroundTransparency = 0.1
 mainFrame.Active = true
 mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 14)
@@ -99,6 +30,10 @@ local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
 titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 14)
+titleCorner.Parent = titleBar
 
 local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(1, -20, 1, 0)
@@ -138,23 +73,27 @@ local function createControl(name, defaultValue, yPos)
     box.BackgroundColor3 = Color3.fromRGB(30, 40, 55)
     box.Parent = frame
 
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
-    Instance.new("UIStroke", box).Color = Color3.fromRGB(70, 100, 150)
+    local boxCorner = Instance.new("UICorner")
+    boxCorner.CornerRadius = UDim.new(0, 6)
+    boxCorner.Parent = box
+    
+    local boxStroke = Instance.new("UIStroke")
+    boxStroke.Color = Color3.fromRGB(70, 100, 150)
+    boxStroke.Parent = box
     
     return box
 end
 
-
 local radius = 50
 local height = 100
-local spinSpeed = 1
-local attractionPower = 1000
+local rotationSpeed = 1
+local attractionStrength = 1000
 local ringPartsEnabled = false
 
 local radiusBox = createControl("RADIUS:", radius, 0.15)
 local heightBox = createControl("HEIGHT:", height, 0.3)
-local spinBox = createControl("SPIN:", spinSpeed, 0.45)
-local powerBox = createControl("POWER:", attractionPower, 0.6)
+local spinBox = createControl("SPIN:", rotationSpeed, 0.45)
+local powerBox = createControl("POWER:", attractionStrength, 0.6)
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0.9, 0, 0, 50)
@@ -166,16 +105,48 @@ toggleButton.TextSize = 18
 toggleButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
 toggleButton.Parent = mainFrame
 
-Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", toggleButton).Color = Color3.fromRGB(200, 60, 60)
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0, 8)
+toggleCorner.Parent = toggleButton
 
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(200, 60, 60)
+toggleStroke.Parent = toggleButton
+
+if not getgenv().Network then
+    getgenv().Network = {
+        BaseParts = {},
+        Velocity = Vector3.new(14.46262424, 14.46262424, 14.46262424)
+    }
+
+    Network.RetainPart = function(Part)
+        if typeof(Part) == "Instance" and Part:IsA("BasePart") and Part:IsDescendantOf(Workspace) then
+            table.insert(Network.BaseParts, Part)
+            Part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
+            Part.CanCollide = false
+        end
+    end
+
+    local function EnablePartControl()
+        LocalPlayer.ReplicationFocus = Workspace
+        RunService.Heartbeat:Connect(function()
+            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
+            for _, Part in pairs(Network.BaseParts) do
+                if Part:IsDescendantOf(Workspace) then
+                    Part.Velocity = Network.Velocity
+                end
+            end
+        end)
+    end
+
+    EnablePartControl()
+end
 
 local function RetainPart(Part)
     if Part:IsA("BasePart") and not Part.Anchored and Part:IsDescendantOf(Workspace) then
         if Part.Parent == LocalPlayer.Character or Part:IsDescendantOf(LocalPlayer.Character) then
             return false
         end
-
         Part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
         Part.CanCollide = false
         return true
@@ -200,41 +171,62 @@ local function removePart(part)
 end
 
 for _, part in pairs(Workspace:GetDescendants()) do
-    addPart(part)
+    if part:IsA("BasePart") then
+        addPart(part)
+    end
 end
 
-Workspace.DescendantAdded:Connect(addPart)
+Workspace.DescendantAdded:Connect(function(part)
+    if part:IsA("BasePart") then
+        addPart(part)
+    end
+end)
+
 Workspace.DescendantRemoving:Connect(removePart)
 
 RunService.Heartbeat:Connect(function()
     if not ringPartsEnabled then return end
-    -- Update settings from GUI
+    
     radius = math.clamp(tonumber(radiusBox.Text) or radius, 10, 1000)
     height = math.clamp(tonumber(heightBox.Text) or height, 1, 500)
-    spinSpeed = math.clamp(tonumber(spinBox.Text) or spinSpeed, 0.1, 10)
-    attractionPower = math.clamp(tonumber(powerBox.Text) or attractionPower, 10, 5000)
+    rotationSpeed = math.clamp(tonumber(spinBox.Text) or rotationSpeed, 0.1, 10)
+    attractionStrength = math.clamp(tonumber(powerBox.Text) or attractionStrength, 100, 5000)
     
-    local humanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        local tornadoCenter = humanoidRootPart.Position
-        for _, part in pairs(parts) do
-            if part.Parent and not part.Anchored then
-                local pos = part.Position
-                local distance = (Vector3.new(pos.X, tornadoCenter.Y, pos.Z) - tornadoCenter).Magnitude
-                local angle = math.atan2(pos.Z - tornadoCenter.Z, pos.X - tornadoCenter.X)
-                local newAngle = angle + math.rad(spinSpeed)
-                local targetPos = Vector3.new(
-                    tornadoCenter.X + math.cos(newAngle) * math.min(radius, distance),
-                    tornadoCenter.Y + (height * (math.abs(math.sin((pos.Y - tornadoCenter.Y) / height)))),
-                    tornadoCenter.Z + math.sin(newAngle) * math.min(radius, distance)
-                )
-                local directionToTarget = (targetPos - part.Position).unit
-                part.Velocity = directionToTarget * attractionPower
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    local playerPosition = humanoidRootPart.Position
+    
+    for i, part in pairs(parts) do
+        if part and part.Parent and not part.Anchored and part ~= humanoidRootPart then
+            if part.Parent == character then continue end
+            
+            local partPosition = part.Position
+            local horizontalOffset = Vector3.new(partPosition.X - playerPosition.X, 0, partPosition.Z - playerPosition.Z)
+            local horizontalDistance = horizontalOffset.Magnitude
+            
+            if horizontalDistance > 0.1 then
+                local currentAngle = math.atan2(horizontalOffset.Z, horizontalOffset.X)
+                local newAngle = currentAngle + math.rad(rotationSpeed)
+                
+                local targetRadius = math.min(radius, horizontalDistance + 5)
+                local targetX = playerPosition.X + math.cos(newAngle) * targetRadius
+                local targetZ = playerPosition.Z + math.sin(newAngle) * targetRadius
+                local targetY = playerPosition.Y + math.sin(tick() * 2 + i) * height * 0.1
+                
+                local targetPosition = Vector3.new(targetX, targetY, targetZ)
+                local direction = (targetPosition - partPosition).Unit
+                
+                if direction.Magnitude > 0 then
+                    part.Velocity = direction * attractionStrength
+                end
             end
         end
     end
 end)
-
 
 toggleButton.MouseButton1Click:Connect(function()
     ringPartsEnabled = not ringPartsEnabled
@@ -242,12 +234,20 @@ toggleButton.MouseButton1Click:Connect(function()
     if ringPartsEnabled then
         toggleButton.Text = "DEACTIVATE RING PARTS"
         toggleButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        toggleStroke.Color = Color3.fromRGB(60, 220, 60)
     else
         toggleButton.Text = "ACTIVATE RING PARTS"
         toggleButton.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+        toggleStroke.Color = Color3.fromRGB(200, 60, 60)
+        
+        for _, part in pairs(parts) do
+            if part and part.Parent then
+                part.Velocity = Vector3.new(0, 0, 0)
+                part.CanCollide = true
+            end
+        end
     end
 end)
-
 
 local dragStart, startPos
 titleBar.InputBegan:Connect(function(input)
